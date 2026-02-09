@@ -1,0 +1,161 @@
+diff --git a/src/api/routes/webhooks.ts b/src/api/routes/webhooks.ts
+new file mode 100644
+index 0000000..b3c4d5e
+--- /dev/null
++++ b/src/api/routes/webhooks.ts
+@@ -0,0 +1,58 @@
++import { Router } from "express";
++import { z } from "zod";
++import { WebhookService } from "../services/webhook.js";
++import { authenticate } from "../middleware/auth.js";
++import { validate } from "../middleware/validate.js";
++
++const router = Router();
++
++const createWebhookSchema = z.object({
++  url: z.string().url(),
++  events: z.array(z.enum(["order.created", "order.updated", "order.cancelled"])),
++  secret: z.string().min(16).optional(),
++});
++
++const updateWebhookSchema = createWebhookSchema.partial();
++
++router.use(authenticate);
++
++// List webhooks for the authenticated user
++router.get("/", async (req, res) => {
++  const webhooks = await WebhookService.listByUser(req.user!.id);
++  res.json({ webhooks });
++});
++
++// Create a new webhook
++router.post("/", validate(createWebhookSchema), async (req, res) => {
++  const webhook = await WebhookService.create({
++    userId: req.user!.id,
++    ...req.body,
++  });
++  res.status(201).json({ webhook });
++});
++
++// Get a specific webhook
++router.get("/:id", async (req, res) => {
++  const webhook = await WebhookService.findById(req.params.id, req.user!.id);
++  if (!webhook) return res.status(404).json({ error: "Webhook not found" });
++  res.json({ webhook });
++});
++
++// Update a webhook
++router.patch("/:id", validate(updateWebhookSchema), async (req, res) => {
++  const webhook = await WebhookService.update(req.params.id, req.user!.id, req.body);
++  if (!webhook) return res.status(404).json({ error: "Webhook not found" });
++  res.json({ webhook });
++});
++
++// Delete a webhook
++router.delete("/:id", async (req, res) => {
++  const deleted = await WebhookService.delete(req.params.id, req.user!.id);
++  if (!deleted) return res.status(404).json({ error: "Webhook not found" });
++  res.status(204).end();
++});
++
++export { router as webhookRouter };
+diff --git a/src/api/services/webhook.ts b/src/api/services/webhook.ts
+new file mode 100644
+index 0000000..c5d6e7f
+--- /dev/null
++++ b/src/api/services/webhook.ts
+@@ -0,0 +1,67 @@
++import crypto from "crypto";
++import { db } from "../../db.js";
++
++interface CreateWebhookInput {
++  userId: string;
++  url: string;
++  events: string[];
++  secret?: string;
++}
++
++export class WebhookService {
++  static async listByUser(userId: string) {
++    return db.webhooks.findMany({ where: { userId } });
++  }
++
++  static async findById(id: string, userId: string) {
++    return db.webhooks.findFirst({ where: { id, userId } });
++  }
++
++  static async create(input: CreateWebhookInput) {
++    const secret = input.secret ?? crypto.randomBytes(32).toString("hex");
++    return db.webhooks.create({
++      data: {
++        userId: input.userId,
++        url: input.url,
++        events: input.events,
++        secret,
++        isActive: true,
++      },
++    });
++  }
++
++  static async update(id: string, userId: string, data: Partial<CreateWebhookInput>) {
++    const existing = await this.findById(id, userId);
++    if (!existing) return null;
++    return db.webhooks.update({ where: { id }, data });
++  }
++
++  static async delete(id: string, userId: string) {
++    const existing = await this.findById(id, userId);
++    if (!existing) return false;
++    await db.webhooks.delete({ where: { id } });
++    return true;
++  }
++
++  /**
++   * Deliver a webhook event to all subscribed endpoints.
++   */
++  static async deliver(event: string, payload: unknown) {
++    const webhooks = await db.webhooks.findMany({
++      where: { events: { has: event }, isActive: true },
++    });
++
++    const results = await Promise.allSettled(
++      webhooks.map(async (webhook) => {
++        const body = JSON.stringify(payload);
++        const signature = crypto
++          .createHmac("sha256", webhook.secret)
++          .update(body)
++          .digest("hex");
++
++        const response = await fetch(webhook.url, {
++          method: "POST",
++          headers: {
++            "Content-Type": "application/json",
++            "X-Webhook-Signature": signature,
++          },
++          body,
++        });
++
++        if (!response.ok) throw new Error(`HTTP ${response.status}`);
++      })
++    );
++
++    return results;
++  }
++}
+diff --git a/src/api/index.ts b/src/api/index.ts
+index a1b2c3d..d4e5f6a 100644
+--- a/src/api/index.ts
++++ b/src/api/index.ts
+@@ -3,6 +3,7 @@ import { orderRouter } from "./routes/orders.js";
+ import { userRouter } from "./routes/users.js";
++import { webhookRouter } from "./routes/webhooks.js";
+
+ const app = express();
+
+@@ -10,6 +11,7 @@ app.use(express.json());
+
+ app.use("/api/orders", orderRouter);
+ app.use("/api/users", userRouter);
++app.use("/api/webhooks", webhookRouter);
+
+ export { app };

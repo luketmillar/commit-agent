@@ -1,0 +1,124 @@
+diff --git a/src/auth/session.ts b/src/auth/session.ts
+index 3a4b2c1..8f7e9d0 100644
+--- a/src/auth/session.ts
++++ b/src/auth/session.ts
+@@ -1,42 +1,35 @@
+-import { Request, Response } from 'express';
+-import jwt from 'jsonwebtoken';
+-import { db } from '../db';
++import { Request, Response } from "express";
++import jwt from "jsonwebtoken";
++import { db } from "../db.js";
++import { SessionError } from "./errors.js";
++import type { Session, User } from "./types.js";
+
+-const SECRET = process.env.JWT_SECRET || 'dev-secret';
+-const EXPIRY = '24h';
++const JWT_SECRET = process.env.JWT_SECRET;
++if (!JWT_SECRET) throw new Error("JWT_SECRET environment variable is required");
+
+-export async function createSession(req: Request, res: Response) {
+-  const { email, password } = req.body;
+-
+-  // Find user
+-  const user = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+-  if (!user.rows[0]) {
+-    return res.status(401).json({ error: 'Invalid credentials' });
+-  }
+-
+-  // Check password
+-  const valid = await checkPassword(password, user.rows[0].password_hash);
+-  if (!valid) {
+-    return res.status(401).json({ error: 'Invalid credentials' });
+-  }
+-
+-  // Create token
+-  const token = jwt.sign(
+-    { userId: user.rows[0].id, email: user.rows[0].email },
+-    SECRET,
+-    { expiresIn: EXPIRY }
+-  );
+-
+-  // Save session
+-  await db.query(
+-    'INSERT INTO sessions (user_id, token, expires_at) VALUES ($1, $2, NOW() + interval \'24 hours\')',
+-    [user.rows[0].id, token]
+-  );
+-
+-  return res.json({ token });
++const SESSION_TTL = 24 * 60 * 60; // 24 hours in seconds
++
++export async function createSession(user: User): Promise<Session> {
++  const token = jwt.sign(
++    { userId: user.id, email: user.email },
++    JWT_SECRET,
++    { expiresIn: SESSION_TTL }
++  );
++
++  const expiresAt = new Date(Date.now() + SESSION_TTL * 1000);
++
++  await db.sessions.create({
++    userId: user.id,
++    token,
++    expiresAt,
++  });
++
++  return { token, expiresAt };
+ }
+
+-export async function validateSession(token: string) {
++export async function validateSession(token: string): Promise<User> {
+   try {
+-    const payload = jwt.verify(token, SECRET);
+-    const session = await db.query('SELECT * FROM sessions WHERE token = $1', [token]);
+-    if (!session.rows[0]) return null;
+-    return payload;
+-  } catch {
+-    return null;
++    const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
++    const session = await db.sessions.findByToken(token);
++    if (!session) throw new SessionError("Session not found");
++    if (session.expiresAt < new Date()) throw new SessionError("Session expired");
++
++    const user = await db.users.findById(payload.userId);
++    if (!user) throw new SessionError("User not found");
++    return user;
++  } catch (err) {
++    if (err instanceof SessionError) throw err;
++    throw new SessionError("Invalid token");
+   }
+ }
+-
+-async function checkPassword(plain: string, hash: string) {
+-  // TODO: use bcrypt
+-  return plain === hash;
+-}
+diff --git a/src/auth/types.ts b/src/auth/types.ts
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/auth/types.ts
+@@ -0,0 +1,12 @@
++export interface User {
++  id: string;
++  email: string;
++  name: string;
++  createdAt: Date;
++}
++
++export interface Session {
++  token: string;
++  expiresAt: Date;
++}
+diff --git a/src/auth/errors.ts b/src/auth/errors.ts
+new file mode 100644
+index 0000000..d4e5f6a
+--- /dev/null
++++ b/src/auth/errors.ts
+@@ -0,0 +1,6 @@
++export class SessionError extends Error {
++  constructor(message: string) {
++    super(message);
++    this.name = "SessionError";
++  }
++}
