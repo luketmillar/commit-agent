@@ -2,6 +2,8 @@
 
 A Next.js app that generates commit messages from git diffs using AI through Vercel's AI-gateway. Supports multiple models with real-time streaming of reasoning and output.
 
+Hosted at [https://commit-agent.vercel.app/](https://commit-agent.vercel.app/)
+
 ## Setup
 
 ```bash
