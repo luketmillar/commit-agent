@@ -10,4 +10,5 @@ export interface StepResult {
     cacheWriteTokens?: number;
   };
   cost?: number;
+  pricing?: { input: string; output: string };
 }

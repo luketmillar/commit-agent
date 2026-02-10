@@ -10,3 +10,4 @@ Some things didn't work:
 - documentation for deltas say data.delta but i'm seeing data.text
 - i dont see instructions on reasoning streaming
 - why can't you do model-level provideroptions? it's per-call?
+- no getModelById?

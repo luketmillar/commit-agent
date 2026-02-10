@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect } from "react";
 import { useGenerateCommitMessage } from "./api";
 import { StreamingPanel } from "./components/StreamingPanel";
-import { MetadataGrid } from "./components/MetadataGrid";
+import { ModelUsageMetadata } from "./components/ModelUsageMetadata";
 
 interface Model {
   id: string;
   name: string;
+  pricing?: { input: string; output: string };
 }
 
 const RECOMMENDED = new Set([
@@ -147,7 +148,7 @@ export default function Home() {
             </details>
           )}
           <div className="result-box">{result.commitMessage}</div>
-          <MetadataGrid step={result.step} />
+          <ModelUsageMetadata step={result.step} />
         </>
       )}
     </main>
