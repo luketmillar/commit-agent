@@ -52,15 +52,22 @@ export default function Home() {
     }
   }, [streamingReasoning]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setDiff(ev.target?.result as string);
-    };
-    reader.readAsText(file);
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const parts: string[] = [];
+    for (const file of Array.from(files)) {
+      const text = await file.text();
+      parts.push(text);
+    }
+
+    setDiff(parts.join("\n"));
+    setFileName(
+      files.length === 1
+        ? files[0].name
+        : `${files.length} files`
+    );
   };
 
   const handleGenerate = () => {
@@ -72,11 +79,12 @@ export default function Home() {
     <main>
       <h1>Commit Agent</h1>
 
-      <label htmlFor="diff-file">Upload diff file</label>
+      <label htmlFor="diff-file">Upload diff files</label>
       <input
         id="diff-file"
         type="file"
         accept=".patch,.diff,.txt"
+        multiple
         onChange={handleFileUpload}
       />
       {fileName && (
