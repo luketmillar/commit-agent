@@ -12,7 +12,7 @@ Issues and gaps encountered while building a commit message generator with the A
 
 **Proposed solution:** Either (a) the gateway should normalize reasoning into a single option like `reasoning: { enabled: true, budget: 10000 }` that it translates per-provider, or (b) export typed ProviderOptions per provider from the SDK so you get autocomplete and type checking. At minimum, export the base `ProviderOptions` type from `ai`.
 
-**Priority:** P1 — This is a core DX issue. Every developer using multiple providers will hit this. The lack of types makes it trial-and-error.
+**Priority:** P2 — Not blocking but this is a painful DX issue. Every developer using multiple providers will hit this. The lack of types makes it trial-and-error.
 
 ---
 
@@ -20,7 +20,7 @@ Issues and gaps encountered while building a commit message generator with the A
 
 **What I tried to do:** Display reasoning/thinking text from all models that support it.
 
-**What went wrong:** Some models return reasoning text and some don't, with no documentation on which is which. OpenAI models accept `reasoningEffort` but never returned reasoning text in the response. Anthropic consistently returned reasoning when asked. DeepSeek returned it automatically. There's no way to know upfront whether a model will produce reasoning output.
+**What went wrong:** Some models return reasoning text and some don't, with no documentation on which is which. OpenAI models accept `reasoningEffort` but never returned reasoning text in the response. Anthropic consistently returned reasoning when asked. DeepSeek returned it automatically. There's no way to know if you misconfigured a model or if it never supported it.
 
 **Proposed solution:** At minimum, document which providers/models support reasoning output. The provider list at https://ai-sdk.dev/providers/ai-sdk-providers doesn't mention reasoning support at all. Ideally, add a `capabilities` or `tags` field to the model metadata (from `getAvailableModels()`) that indicates whether a model supports reasoning output — not just whether it accepts reasoning options. Something like `supportsReasoningOutput: true` distinct from `supportsReasoningConfig: true`.
 
@@ -36,7 +36,7 @@ Issues and gaps encountered while building a commit message generator with the A
 
 **Proposed solution:** Update the streamText documentation to clearly show the `fullStream` pattern for reading multiple stream types. Fix the part.type values in the docs (`reasoning-delta` not `reasoning`). Add a guide/example for "streaming reasoning and text together" since this is a common pattern for thinking-model UIs.
 
-**Priority:** P2 — Streaming is the primary way people use these models in production. It functions, but wrong docs here waste significant developer time.
+**Priority:** P2 — Streaming is the primary way people use these models in production. It functions, but the docs are wrong and unclear.
 
 ---
 
@@ -84,7 +84,7 @@ Issues and gaps encountered while building a commit message generator with the A
 
 **Proposed solution:** Add a guide explaining when prompt caching helps and when it doesn't, with concrete examples. Consider adding cache diagnostics to the response (e.g., `cacheStatus: "skipped:prefix_too_short"`) so developers can understand why caching isn't activating instead of debugging silence.
 
-**Priority:** P2 — Caching is provider-specific and not relevant to all use cases. But the complete lack of feedback when it doesn't work wastes debugging time.
+**Priority:** P2 — It's possible this just isn't working at all in which case it'd be a P0, or I'm misunderstanding/misusing it and then it's just clarity issue. Caching is provider-specific and not relevant to all use cases. But the complete lack of feedback when it doesn't work wastes debugging time.
 
 ---
 
@@ -96,7 +96,7 @@ Issues and gaps encountered while building a commit message generator with the A
 
 **Proposed solution:** Add `gateway.estimateCost({ model, system, prompt })` that tokenizes the input and returns estimated costs. Even better, return estimates for multiple models so the UI can show a comparison. The output cost would be estimated based on typical completion ratios, but even an input-only estimate would be valuable.
 
-**Priority:** P2 — Nice-to-have for cost-conscious applications. The gateway already has tokenizers and pricing data, so this is a natural extension. There may be a tokenization workaround for this.
+**Priority:** P3 — Nice-to-have for cost-conscious applications. The gateway already has tokenizers and pricing data, so this is a natural extension. There may be a tokenization workaround for this.
 
 ---
 
