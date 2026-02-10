@@ -93,7 +93,8 @@ export async function POST(request: Request) {
               models: ["openai/gpt-4.1-mini", "anthropic/claude-haiku-4.5"],
             },
             anthropic: {
-              thinking: { type: "enabled" as const, budgetTokens: 5000 }
+              thinking: { type: "enabled" as const, budgetTokens: 5000 },
+              cacheControl: { type: "ephemeral" as const },
             },
             openai: {
               reasoningEffort: "high" as const,
